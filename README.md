@@ -1,17 +1,17 @@
 # MouseHook
-MouseHook is an open source macOS app written in Swift that allows you to hook a duplicate mouse cursor to your mouse's location and have it mimic the appearance of your mouse. This is especially useful for fixing the annoying issue where the software Parsec doesn't show the host mouse when using it as a monitor extender.
+MouseHook is an open source macOS app written in Swift that allows you to hook a duplicate mouse cursor to your mouse's location and have it mimic the appearance of your mouse. This is especially useful for fixing the annoying issue where Parsec doesn't show the host mouse when using it as a monitor extender.
 
 Please note that MouseHook has only been developed and tested in my personal environment and I cannot provide any guarantees that it will work in other environments. Use at your own risk.
 
 ## Installation
 
-To install Togemon, download the latest release from the releases page and drag the app to your Applications folder. You may have to allow unsigned applications in `Security and Privacy`.
+To install MouseHook, download the latest release from the releases page and drag the app to your Applications folder. You may have to allow unsigned applications in `Security and Privacy`.
 
 Alternatively, you can clone the repository and build the app from source:
 
 ```
-git clone https://github.com/brgj/Togemon.git
-cd Togemon
+git clone https://github.com/brgj/MouseHook.git
+cd MouseHook
 xcodebuild
 ```
 
