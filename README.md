@@ -28,4 +28,4 @@ To use MouseHook, simply launch the app and click the app icon in the menu bar. 
 
 ## License
 
-Togemon is licensed under the Apache License v2.
+MouseHook is licensed under the Apache License v2.
