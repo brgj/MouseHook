@@ -82,6 +82,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         mouseWindow.backgroundColor = .clear
         mouseWindow.level = .screenSaver
         mouseWindow.orderFront(nil)
+        mouseWindow.collectionBehavior = .canJoinAllSpaces
     }
     
     func setupMenu() {
