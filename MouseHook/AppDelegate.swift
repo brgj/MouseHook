@@ -6,39 +6,82 @@
 //
 
 import Cocoa
+import Combine
 
 class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var statusItem: NSStatusItem!
     private var menu: NSMenu!
+    private var mouseWindow: NSWindow!
     private var mouseController: MouseViewController!
+    private var slowEventThrottle: Publishers.Throttle<PassthroughSubject<NSEvent, Never>, DispatchQueue>!
+    private var fastEventThrottle: Publishers.Throttle<PassthroughSubject<NSEvent, Never>, DispatchQueue>!
+    private var refreshObserver: NSKeyValueObservation!
+    private var eventMonitor: Any!
+    private var cancellationToken: AnyCancellable?
+    
+    @objc private dynamic var fastFreqRefresh: Bool = false
+    
+    private let eventSubject = PassthroughSubject<NSEvent, Never>()
     private let userDefaults = UserDefaults.standard
+    
+    deinit {
+        refreshObserver?.invalidate()
+        NSEvent.removeMonitor(eventMonitor!)
+    }
 
     func applicationDidFinishLaunching(_ aNotification: Notification) {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         if let button = statusItem.button {
             button.image = NSImage(named: NSImage.Name("mousehook-menubar"))
         }
-        
         mouseController = MouseViewController()
-        setupMouseHook()
+        fastEventThrottle = self.eventSubject.throttle(for: .seconds(1.0/60.0), scheduler: DispatchQueue.global(), latest: true) // 60Hz
+        slowEventThrottle = self.eventSubject.throttle(for: .seconds(1.0/5.0), scheduler: DispatchQueue.global(), latest: true) // 5Hz
+        
+        setupMouseWindow()
         setupMenu()
         statusItem.menu = menu
+        
+        refreshObserver = self.observe(\.fastFreqRefresh, options: [.new], changeHandler: { (this, change) in
+            self.cancellationToken?.cancel()
+            
+            let eventThrottle = change.newValue! ? self.fastEventThrottle : self.slowEventThrottle
+            
+            self.cancellationToken = eventThrottle?.subscribe(on: DispatchQueue.global()).sink { event in
+                // Don't bother updating mouse position if it is currently hidden
+                DispatchQueue.main.async {
+                    self.update(event)
+                }
+            }
+        })
+        fastFreqRefresh = true
+        
+        //TODO: Find a way to make global event monitoring not take up SO MUCH CPU
+        eventMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.mouseMoved, .leftMouseDragged, .rightMouseDragged, .otherMouseDragged]) { (event) in
+            self.eventSubject.send(event)
+        }
     }
     
-    func setupMouseHook() {
-        let mouseWindow = NSWindow(contentViewController: mouseController)
+    func update(_ event: NSEvent) {
+        let cursorVisible = mouseController.update(event)
+        
+        if cursorVisible {
+            mouseWindow.setFrameOrigin(mouseController.getFrameOrigin(event.locationInWindow))
+        }
+        // Only use fast refresh rate if the cursor is actually visible
+        if (fastFreqRefresh != cursorVisible) {
+            fastFreqRefresh = cursorVisible
+        }
+    }
+    
+    func setupMouseWindow() {
+        mouseWindow = NSWindow(contentViewController: mouseController)
         mouseWindow.styleMask = [.borderless]
         mouseWindow.ignoresMouseEvents = true
         mouseWindow.setFrame(NSRect(x: 0, y: 0, width: 50, height: 50), display: false)
         mouseWindow.backgroundColor = .clear
         mouseWindow.level = .screenSaver
         mouseWindow.orderFront(nil)
-        
-        NSEvent.addGlobalMonitorForEvents(matching: [.mouseMoved, .leftMouseDragged, .rightMouseDragged, .otherMouseDragged]) { (event) in
-            let mouseLocation = event.locationInWindow
-            mouseWindow.setFrameOrigin(self.mouseController.getFrameOrigin(mouseLocation))
-            self.mouseController.update(event)
-        }
     }
     
     func setupMenu() {
@@ -81,6 +124,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     
     @objc func menuItemClicked(item: NSMenuItem) {
         updateEnabledMonitors(CGDirectDisplayID(item.identifier!.rawValue)!)
+        mouseController.resetCurrentMonitor()
     }
     
     func updateEnabledMonitors(_ toUpdate: CGDirectDisplayID) {
